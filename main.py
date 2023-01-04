@@ -2,7 +2,9 @@ from gensim import downloader
 import numpy as np
 import torch
 from torch import nn
-from pos_embedding import transform
+
+# Pre-processing and tokenization
+
 
 def load_data(path_to_data):
     sentences = []
@@ -27,8 +29,20 @@ def load_data(path_to_data):
     return sentences, list(set(pos))
 
 
+def pos_to_oneHot(pos_list):
+    tensor_dim = len(pos_list)
+    one_hot_tensors = []
+    for pos in pos_list:
+        one_hot_tensor = torch.zeros(tensor_dim)
+        one_hot_tensor[pos_list.index(pos)] = 1
+        one_hot_tensors.append(one_hot_tensor)
+
+    return torch.stack(one_hot_tensors)
+
+
 def tokenize(sentences, model, length, pos_list):
-    pos_to_vec = transform(pos_list)
+    pos_to_vec = pos_to_oneHot(pos_list)
+    print(pos_to_vec)
     set_data = []
 
     for sentence in sentences:
@@ -37,42 +51,14 @@ def tokenize(sentences, model, length, pos_list):
                 word_vec = torch.zeros(length)
             else:
                 word_vec = torch.Tensor(model[word[1]].tolist())
-
+            print(word[2])
             pos_vec = pos_to_vec[word[2]]
+            print(pos_vec)
+            exit()
             final_vec = torch.cat((word_vec, pos_vec))
             set_data.append(final_vec)
 
     return set_data
-
-
-class AutoencoderNN(torch.nn.Module):
-    def __init__(self):
-        super(AutoencoderNN).__init__()
-        self.loss = nn.MSELoss()
-        self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(45, 32),
-            torch.nn.ReLU(),
-            torch.nn.Linear(32, 16),
-            torch.nn.ReLU(),
-            torch.nn.Linear(16, 8),
-            torch.nn.ReLU(),
-            torch.nn.Linear(8, 4)
-        )
-
-        self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(4, 8),
-            torch.nn.ReLU(),
-            torch.nn.Linear(8, 16),
-            torch.nn.ReLU(),
-            torch.nn.Linear(16, 32),
-            torch.nn.ReLU(),
-            torch.nn.Linear(32, 45)
-        )
-
-    def forward(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded, self.loss(decoded, x)
 
 
 def main():
@@ -80,8 +66,6 @@ def main():
     test_sentences, pos_test = load_data('test.labeled')
     tokenize_model = downloader.load('glove-twitter-100')
     tokenized_train = tokenize(train_sentences, tokenize_model, 100, pos_train)
-    print(tokenized_train[0].shape)
-    exit()
     tokenized_test = tokenize(test_sentences, tokenize_model, 100, pos_test)
 
     # print(train_sentences[0])
